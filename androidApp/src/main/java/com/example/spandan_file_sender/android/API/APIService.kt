@@ -14,17 +14,17 @@ import javax.annotation.processing.Generated
 interface APIService
 {
 
-    @GET("spandan/testing.php")
+    @GET("SMJ1/testing.php")
     suspend fun getdata() : ResponseBody
 
     @GET("mydata")
     suspend fun getdata1() : ResponseBody
 
     @Multipart
-    @POST("spandan/x2s.php")
+    @POST("SMJ1/x2s.php")
     suspend fun uploadPdfFile(
         @Part pdffile : MultipartBody.Part
-    ): ResponseBody
+    ) : ResponseBody
 }
 
 

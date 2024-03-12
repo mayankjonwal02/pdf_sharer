@@ -4,9 +4,11 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
@@ -17,7 +19,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -27,11 +31,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.modifier.modifierLocalConsumer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.spandan_file_sender.android.API.APIViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -44,13 +51,14 @@ import java.io.File
 import java.io.FileOutputStream
 
 class MainActivity : ComponentActivity() {
-    @SuppressLint("CoroutineCreationDuringComposition")
+    @OptIn(ExperimentalMaterial3Api::class)
+    @SuppressLint("CoroutineCreationDuringComposition", "CommitPrefEdits")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if(Intent.ACTION_SEND == intent.action)
         {
             setContent {
-                MyApplicationTheme {
+//                MyApplicationTheme {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background
@@ -68,11 +76,15 @@ class MainActivity : ComponentActivity() {
 
                             Text(text = info.value)
                             getpermissiononsend(context,myviewmodel,pdfURI,info)
+//                            LaunchedEffect(info)
+//                            {
+//                                Toast.makeText(context,info.value,Toast.LENGTH_SHORT).show()
+//                            }
 
 
 
                         }
-                    }
+//                    }
                 }
             }
 
@@ -81,35 +93,53 @@ class MainActivity : ComponentActivity() {
         }
         else
         {
+
+
             setContent {
-                MyApplicationTheme {
+                var context = LocalContext.current
+                var ipaddress by remember {
+                    mutableStateOf(getsharedpref(context)?.getString("ipaddress","0.0.0.0"))
+                }
+//                MyApplicationTheme {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background
                     ) {
                         val context = LocalContext.current
-                        val myviewmodel = APIViewModel(context)
+//                        val myviewmodel = APIViewModel(context)
                         var info by remember {
                             mutableStateOf("fetching data")
                         }
-                        CoroutineScope(Dispatchers.IO).launch {
-                            info = myviewmodel.mydata()
-                        }
+//                        CoroutineScope(Dispatchers.IO).launch {
+//                            info = myviewmodel.mydata()
+//                        }
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .background(color = Color(android.graphics.Color.parseColor("#F5F5DC")))
                         )
                         {
-                            Text(text = info)
+
+
+                           Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                               Text(text = info)
+                               TextField(value = ipaddress!!, onValueChange = {ipaddress = it
+                               getsharedpref(context)?.edit()?.putString("ipaddress",it)?.apply()
+                               })
+//                               TextField(value = "hello", onValueChange ={} )
+
+
+                           }
+
                         }
 
                         getpermission(context = context)
                     }
                 }
-            }
+//            }
         }
     }
+
 }
 
 
@@ -143,7 +173,8 @@ fun SaveSendFile(context: Context, uri: Uri, myviewmodel: APIViewModel, info: Mu
             Toast.makeText(context,pdffile.name + " saved",Toast.LENGTH_SHORT).show()
             CoroutineScope(Dispatchers.IO).launch {
                 if(pdffile.exists()){
-                    info.value = myviewmodel.uploadPdf(context, pdffile.absolutePath)
+                    info .value =
+                        myviewmodel.uploadPdf(context, pdffile.absolutePath)
                     pdffile.delete()
                 }
             }
@@ -154,18 +185,6 @@ fun SaveSendFile(context: Context, uri: Uri, myviewmodel: APIViewModel, info: Mu
 }
 
 
-@SuppressLint("Range")
-private fun getFilePathFromURI(context: Context, uri: Uri): String {
-    val filePath: String
-    val cursor = context.contentResolver.query(uri, null, null, null, null)
-    if (cursor != null && cursor.moveToFirst()) {
-        filePath = cursor.getString(cursor.getColumnIndex(MediaStore.Images.ImageColumns.DATA))
-        cursor.close()
-    } else {
-        filePath = uri.path ?: ""
-    }
-    return filePath
-}
 
 @Composable
 fun getpermission(context: Context)
@@ -180,12 +199,46 @@ fun getpermission(context: Context)
         }
         else
         {
-            Toast.makeText(context,"Permissions Not Granted",Toast.LENGTH_SHORT).show()
+            val notGrantedPermissions = permissions.filter { !it.value }.keys.joinToString(", ")
+            Toast.makeText(context, "Permissions not granted: $notGrantedPermissions", Toast.LENGTH_SHORT).show()
         }
     })
     LaunchedEffect(Unit)
     {
-        permissionlauncher.launch(arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE,Manifest.permission.WRITE_EXTERNAL_STORAGE))
+//        permissionlauncher.launch(
+//
+//            arrayOf(
+////                Manifest.permission.READ_EXTERNAL_STORAGE,Manifest.permission.WRITE_EXTERNAL_STORAGE
+//            )
+//
+//        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (Build.VERSION.SDK_INT > 31) {
+                // For Android 13 (S) and above
+                Toast.makeText(context,"ANDROID >= 13 & ${Build.VERSION.SDK_INT} & ${Build.VERSION.RELEASE}",Toast.LENGTH_SHORT).show()
+                permissionlauncher.launch(
+                    arrayOf(
+                        Manifest.permission.READ_MEDIA_IMAGES,
+                        Manifest.permission.READ_MEDIA_VIDEO,
+//                        Manifest.permission.WRITE_EXTERNAL_STORAGE
+                    )
+                )
+            } else {
+                // For Android 12 (S) and below
+                Toast.makeText(context,"ANDROID <= 12 & ${Build.VERSION.SDK_INT} & ${Build.VERSION.RELEASE}",Toast.LENGTH_SHORT).show()
+                permissionlauncher.launch(
+                    arrayOf(
+                        Manifest.permission.READ_EXTERNAL_STORAGE,
+                        Manifest.permission.WRITE_EXTERNAL_STORAGE
+                    )
+                )
+            }
+        } else {
+            Toast.makeText(context,"Lower Version ${Build.VERSION.SDK_INT} & ${Build.VERSION.RELEASE}",Toast.LENGTH_SHORT).show()
+
+        }
+
+
     }
 }
 
@@ -208,42 +261,58 @@ fun getpermissiononsend(
         }
         else
         {
-            Toast.makeText(context,"Permissions Not Granted",Toast.LENGTH_SHORT).show()
+            val notGrantedPermissions = permissions.filter { !it.value }.keys.joinToString(", ")
+            Toast.makeText(context, "Permissions not granted: $notGrantedPermissions", Toast.LENGTH_SHORT).show()
         }
     })
     LaunchedEffect(Unit)
     {
-        permissionlauncher.launch(arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE,Manifest.permission.WRITE_EXTERNAL_STORAGE))
+
+//        permissionlauncher.launch(
+//
+//            arrayOf(
+////                Manifest.permission.READ_EXTERNAL_STORAGE,Manifest.permission.WRITE_EXTERNAL_STORAGE
+//            )
+//
+//        )
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (Build.VERSION.SDK_INT > 31) {
+                // For Android 13 (S) and above
+                Toast.makeText(context,"ANDROID >= 13 & ${Build.VERSION.SDK_INT} & ${Build.VERSION.RELEASE}",Toast.LENGTH_SHORT).show()
+                permissionlauncher.launch(
+                    arrayOf(
+                        Manifest.permission.READ_MEDIA_IMAGES,
+                        Manifest.permission.READ_MEDIA_VIDEO,
+//                        Manifest.permission.WRITE_EXTERNAL_STORAGE
+                    )
+                )
+            } else {
+                // For Android 12 (S) and below
+                Toast.makeText(context,"ANDROID <= 12 & ${Build.VERSION.SDK_INT} & ${Build.VERSION.RELEASE}",Toast.LENGTH_SHORT).show()
+                permissionlauncher.launch(
+                    arrayOf(
+                        Manifest.permission.READ_EXTERNAL_STORAGE,
+                        Manifest.permission.WRITE_EXTERNAL_STORAGE
+                    )
+                )
+            }
+        } else {
+            SaveSendFile(context, pdfURI, myviewmodel, info)
+
+        }
+
+
+
     }
 }
 
 
-@Composable
-fun DisplayPDF(pdfURI: Uri)
-{
-    val context = LocalContext.current
-    val view = LocalView.current
-    val file = File(pdfURI.path)
-    val parcelFileDescriptor : ParcelFileDescriptor? = ParcelFileDescriptor.open(file,ParcelFileDescriptor.MODE_READ_ONLY)
-    parcelFileDescriptor?.let {
-        val pdfRenderer = PdfRenderer(it)
-        val pagecount = pdfRenderer.pageCount
-        val currentpage = 0
-        val page = pdfRenderer.openPage(currentpage)
-        val bitmap = Bitmap.createBitmap(page.width,page.height,Bitmap.Config.ARGB_8888)
-        page.render(bitmap,null,null,PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-        page.close()
-        pdfRenderer.close()
-        Image(bitmap = bitmap.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize())
-    }
-
+fun getsharedpref(context: Context): SharedPreferences? {
+    return context.getSharedPreferences("myprefs",Context.MODE_PRIVATE)
 }
 
 
-@Preview
-@Composable
-fun DefaultPreview() {
-    MyApplicationTheme {
 
-    }
-}
+
+

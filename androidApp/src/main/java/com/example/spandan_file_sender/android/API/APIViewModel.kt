@@ -6,6 +6,7 @@ import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import androidx.lifecycle.ViewModel
+import com.example.spandan_file_sender.android.getsharedpref
 import com.google.gson.GsonBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -27,7 +28,7 @@ import javax.net.ssl.X509TrustManager
 class APIViewModel(context: Context):ViewModel()
 {
     lateinit var apiService: APIService
-    var ipaddress = "172.31.2.248"
+    var ipaddress = "3.111.170.27" //getsharedpref(context)?.getString("ipaddress","0.0.0.0")
     private val trustAllManager = object : X509TrustManager {
         override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
         override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
@@ -77,14 +78,16 @@ class APIViewModel(context: Context):ViewModel()
             "pdfFile",file.name, RequestBody.create(MediaType.parse("application/pdf"),file)
         )
         try {
-            val responce = apiService.uploadPdfFile(requestBody)
-            Log.e("upload",responce.string().toString())
+            val responce =
+                apiService.uploadPdfFile(requestBody)
+            val responseString = responce.string()
+            Log.e("upload", "responce : $responseString")
             GlobalScope.launch(Dispatchers.Main)
             {
-                Toast.makeText(context,responce.string().toString(),Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "responce : $responseString",Toast.LENGTH_SHORT).show()
 
             }
-            return responce.string().toString()
+            return responseString.toString()
         }
         catch (e:IOException)
         {
